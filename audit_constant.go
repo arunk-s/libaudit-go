@@ -2,7 +2,7 @@ package netlinkAudit
 
 const (
 
-	MAX_AUDIT_MESSAGE_LENGTH = 8970
+	MAX_AUDIT_MESSAGE_LENGTH = 8988
 	AUDIT_MAX_FIELDS         = 64
 	AUDIT_BITMASK_SIZE       = 64
 	//Rule Flags

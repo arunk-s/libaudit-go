@@ -19,20 +19,20 @@ type NetlinkMessage syscall.NetlinkMessage
 
 // This is the struct for an "audit_status" message.
 type AuditStatus struct {
-	Mask              uint32 /* Bit mask for valid entries */
-	Enabled           uint32 /* 1 = enabled, 0 = disabled */
-	Failure           uint32 /* Failure-to-log action */
-	Pid               uint32 /* pid of auditd process */
-	Rate_limit        uint32 /* messages rate limit (per second) */
-	Backlog_limit     uint32 /* waiting messages limit */
-	Lost              uint32 /* messages lost */
-	Backlog           uint32 /* messages waiting in queue */
-	Version           uint32 /* audit api version number */
-	BacklogWaitTime   uint32 /* message queue wait timeout */
+	Mask            uint32 /* Bit mask for valid entries */
+	Enabled         uint32 /* 1 = enabled, 0 = disabled */
+	Failure         uint32 /* Failure-to-log action */
+	Pid             uint32 /* pid of auditd process */
+	Rate_limit      uint32 /* messages rate limit (per second) */
+	Backlog_limit   uint32 /* waiting messages limit */
+	Lost            uint32 /* messages lost */
+	Backlog         uint32 /* messages waiting in queue */
+	Version         uint32 /* audit api version number */
+	BacklogWaitTime uint32 /* message queue wait timeout */
 }
 
 type NetlinkConnection struct {
-	fd  int
+	fd      int
 	address syscall.SockaddrNetlink
 }
 
@@ -98,7 +98,7 @@ func newNetlinkAuditRequest(proto uint16, family, sizeofData int) *NetlinkMessag
 	rr.Header.Len = uint32(syscall.NLMSG_HDRLEN + sizeofData)
 	rr.Header.Type = uint16(proto)
 	rr.Header.Flags = syscall.NLM_F_REQUEST | syscall.NLM_F_ACK
-	rr.Header.Seq = atomic.AddUint32(&sequenceNumber , 1) //Autoincrementing Sequence
+	rr.Header.Seq = atomic.AddUint32(&sequenceNumber, 1) //Autoincrementing Sequence
 	return rr
 	//	return rr.ToWireFormat()
 }
@@ -233,7 +233,7 @@ func AuditSetEnabled(s *NetlinkConnection) error {
 	return nil
 }
 
-/* 
+/*
  * This function will return 0 if auditing is NOT enabled and
  * 1 if enabled, and -1 and an error on error.
  */
@@ -259,20 +259,20 @@ done:
 			}
 
 			switch v := address.(type) {
-				case *syscall.SockaddrNetlink:
-					if m.Header.Seq != uint32(wb.Header.Seq) {
-						return -1, errors.New("Wrong Seq no " +
-							        string(int(m.Header.Seq)) +
-							        ", expected " + string(int(wb.Header.Seq)))
-					}
-					if m.Header.Pid != v.Pid {
-						return -1, errors.New("Wrong Seq nr " +
-										string(int(m.Header.Pid)) +
-										", expected " + string(int(v.Pid)))
-					}
+			case *syscall.SockaddrNetlink:
+				if m.Header.Seq != uint32(wb.Header.Seq) {
+					return -1, errors.New("Wrong Seq no " +
+						string(int(m.Header.Seq)) +
+						", expected " + string(int(wb.Header.Seq)))
+				}
+				if m.Header.Pid != v.Pid {
+					return -1, errors.New("Wrong Seq nr " +
+						string(int(m.Header.Pid)) +
+						", expected " + string(int(v.Pid)))
+				}
 
-				default:
-					return -1, syscall.EINVAL
+			default:
+				return -1, syscall.EINVAL
 			}
 
 			if m.Header.Type == syscall.NLMSG_DONE {
@@ -303,7 +303,7 @@ done:
 
 // Sends a message to kernel for setting of program pid
 /*,Wait mode WAIT_YES | WAIT_NO */
-func AuditSetPid(s *NetlinkConnection, pid uint32 ) error {
+func AuditSetPid(s *NetlinkConnection, pid uint32) error {
 	var status AuditStatus
 	status.Mask = AUDIT_STATUS_PID
 	status.Pid = pid
@@ -327,7 +327,6 @@ func AuditSetPid(s *NetlinkConnection, pid uint32 ) error {
 	//Polling in GO Is it needed ?
 	return nil
 }
-
 
 func AuditSetRateLimit(s *NetlinkConnection, limit int) error {
 	var foo AuditStatus
@@ -378,7 +377,6 @@ func AuditSetBacklogLimit(s *NetlinkConnection, limit int) error {
 	return nil
 
 }
-
 
 func isDone(msgchan chan string, errchan chan error, done <-chan bool) bool {
 	var d bool
@@ -472,7 +470,6 @@ func GetreplyWithoutSync(s *NetlinkConnection) {
 	}
 }
 
-
 // Receives messages from Kernel and forwards to channels
 func Getreply(s *NetlinkConnection, done <-chan bool, msgchan chan string, errchan chan error) {
 	for {
@@ -531,7 +528,6 @@ func Getreply(s *NetlinkConnection, done <-chan bool, msgchan chan string, errch
 	}
 
 }
-
 
 /*
 If further needed

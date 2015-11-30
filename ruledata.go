@@ -706,7 +706,7 @@ func SetRules(s *NetlinkConnection, content []byte) error {
 				action := AUDIT_ALWAYS
 				_audit_syscalladded = true
 
-				err := AuditSetupWatchName(&dd, path.(string))
+				err := AuditSetupAndAddWatchDir(&dd, path.(string))
 				if err != nil {
 					log.Fatalln(err)
 				}
@@ -849,7 +849,7 @@ func check_path(path_name string) error {
 	return nil
 }
 
-func AuditSetupWatchName(rule *AuditRuleData, path_name string) error {
+func AuditSetupAndAddWatchDir(rule *AuditRuleData, path_name string) error {
 	type_name := uint16(AUDIT_WATCH)
 
 	err := check_path(path_name)

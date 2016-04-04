@@ -298,7 +298,7 @@ done:
 }
 
 // Sends a message to kernel for setting of program pid
-// Wait mode WAIT_YES | WAIT_NO 
+// Wait mode WAIT_YES | WAIT_NO
 func AuditSetPid(s *NetlinkConnection, pid uint32) error {
 	var status AuditStatus
 	status.Mask = AUDIT_STATUS_PID

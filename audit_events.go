@@ -1,13 +1,13 @@
 package netlinkAudit
 
 import (
-	"syscall"
-	"strconv"
-	"regexp"
-	"errors"
 	"encoding/hex"
-	"strings"
+	"errors"
 	"log"
+	"regexp"
+	"strconv"
+	"strings"
+	"syscall"
 )
 
 type EventCallback func(*AuditEvent, chan error, ...interface{})
@@ -15,16 +15,16 @@ type EventCallback func(*AuditEvent, chan error, ...interface{})
 type RawEventCallback func(string, chan error, ...interface{})
 
 type AuditEvent struct {
-	Serial				int
-	Timestamp			float64
-	Type 				string
-	Data 				map[string]string
-	Raw 				string
+	Serial    int
+	Timestamp float64
+	Type      string
+	Data      map[string]string
+	Raw       string
 }
 
-func ParseAuditKeyValue(str string) (map[string]string) {
+func ParseAuditKeyValue(str string) map[string]string {
 	audit_key_string := map[string]bool{
-		"name":true,
+		"name": true,
 	}
 	re_kv := regexp.MustCompile(`((?:\\.|[^= ]+)*)=("(?:\\.|[^"\\]+)*"|(?:\\.|[^ "\\]+)*)`)
 	re_quotedstring := regexp.MustCompile(`".+"`)
@@ -32,7 +32,7 @@ func ParseAuditKeyValue(str string) (map[string]string) {
 	kv := re_kv.FindAllStringSubmatch(str, -1)
 	m := make(map[string]string)
 
-	for _,e := range(kv) {
+	for _, e := range kv {
 		key := e[1]
 		value := e[2]
 		if re_quotedstring.MatchString(value) {
@@ -40,8 +40,8 @@ func ParseAuditKeyValue(str string) (map[string]string) {
 		}
 
 		if audit_key_string[key] {
-			if re_quotedstring.MatchString(value) == false  {
-				v,err := hex.DecodeString(value)
+			if re_quotedstring.MatchString(value) == false {
+				v, err := hex.DecodeString(value)
 				if err == nil {
 					m[key] = string(v)
 				}
@@ -58,17 +58,17 @@ func ParseAuditEvent(str string) (int, float64, map[string]string, error) {
 	match := re.FindStringSubmatch(str)
 
 	if len(match) != 4 {
-		return 0,0,nil,errors.New("Error while parsing audit message : Invalid Message")
+		return 0, 0, nil, errors.New("Error while parsing audit message : Invalid Message")
 	}
 
 	serial, err := strconv.ParseInt(match[2], 10, 32)
 	if err != nil {
-		return 0,0,nil,errors.New("Error while parsing audit message : Invalid Message")
+		return 0, 0, nil, errors.New("Error while parsing audit message : Invalid Message")
 	}
 
 	timestamp, err := strconv.ParseFloat(match[1], 64)
 	if err != nil {
-		return 0,0,nil,errors.New("Error while parsing audit message : Invalid Message")
+		return 0, 0, nil, errors.New("Error while parsing audit message : Invalid Message")
 	}
 
 	data := ParseAuditKeyValue(match[3])
@@ -83,19 +83,19 @@ func NewAuditEvent(msg NetlinkMessage) (*AuditEvent, error) {
 	}
 
 	raw := string(msg.Data[:])
-	aetype :=  auditConstant(msg.Header.Type).String()[6:]
+	aetype := auditConstant(msg.Header.Type).String()[6:]
 	if aetype == "auditConstant("+strconv.Itoa(int(msg.Header.Type))+")" {
 		return nil, errors.New("Unknown Type: " + string(msg.Header.Type))
 	}
 
 	ae := &AuditEvent{
-		Serial:		serial,
-		Timestamp:	timestamp,
-		Type:		aetype,
-		Data:		data,
-		Raw:		raw,
+		Serial:    serial,
+		Timestamp: timestamp,
+		Type:      aetype,
+		Data:      data,
+		Raw:       raw,
 	}
-	return ae,nil
+	return ae, nil
 }
 
 func GetAuditEvents(s *NetlinkConnection, cb EventCallback, ec chan error, args ...interface{}) {
@@ -103,7 +103,7 @@ func GetAuditEvents(s *NetlinkConnection, cb EventCallback, ec chan error, args 
 		for {
 			select {
 			default:
-				msgs, _ := s.Receive(syscall.NLMSG_HDRLEN + MAX_AUDIT_MESSAGE_LENGTH, 0)
+				msgs, _ := s.Receive(syscall.NLMSG_HDRLEN+MAX_AUDIT_MESSAGE_LENGTH, 0)
 				for _, msg := range msgs {
 					if msg.Header.Type == syscall.NLMSG_ERROR {
 						err := int32(nativeEndian().Uint32(msg.Data[0:4]))
@@ -126,13 +126,12 @@ func GetAuditEvents(s *NetlinkConnection, cb EventCallback, ec chan error, args 
 	}()
 }
 
-
 func GetRawAuditEvents(s *NetlinkConnection, cb RawEventCallback, ec chan error, args ...interface{}) {
 	go func() {
 		for {
 			select {
 			default:
-				msgs, _ := s.Receive(syscall.NLMSG_HDRLEN + MAX_AUDIT_MESSAGE_LENGTH, 0)
+				msgs, _ := s.Receive(syscall.NLMSG_HDRLEN+MAX_AUDIT_MESSAGE_LENGTH, 0)
 				for _, msg := range msgs {
 					m := ""
 					if msg.Header.Type == syscall.NLMSG_ERROR {

@@ -27,7 +27,7 @@ type AuditRuleData struct {
 	Values      [AUDIT_MAX_FIELDS]uint32
 	Fieldflags  [AUDIT_MAX_FIELDS]uint32
 	Buflen      uint32 // total length of string fields
-	Buf         []byte // string fields buffer 
+	Buf         []byte // string fields buffer
 }
 
 // For fieldtab
@@ -150,20 +150,21 @@ var _audit_permadded bool
 var _audit_syscalladded bool
 
 // Load x86 map and fieldtab.json
-func loadSysMap_FieldTab(x86_map interface{}, fieldmap *Field) error {
-	path, _ := filepath.Abs("libaudit-go/audit_x86_64.json")
+func loadSysMapFieldTab(prefixPath string, x86Map interface{}, fieldmap *Field) error {
+	//TODO: Fix following hack for a better method
+	path, _ := filepath.Abs(prefixPath + "/vendor/github.com/mozilla/libaudit-go/audit_x86_64.json")
 	content2, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	path, _ = filepath.Abs("libaudit-go/fieldtab.json")
+	path, _ = filepath.Abs(prefixPath + "/vendor/github.com/mozilla/libaudit-go/fieldtab.json")
 	content3, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	err = json.Unmarshal([]byte(content2), &x86_map)
+	err = json.Unmarshal([]byte(content2), &x86Map)
 	if err != nil {
 		return err
 	}
@@ -198,9 +199,9 @@ func AuditRuleSyscallData(rule *AuditRuleData, scall int) error {
 	return nil
 }
 
-func AuditNameToFtype(name string, value *int) error {
+func AuditNameToFtype(name, prefixPath string, value *int) error {
 
-	path, _ := filepath.Abs("libaudit-go/ftypetab.json")
+	path, _ := filepath.Abs(prefixPath + "/vendor/github.com/mozilla/libaudit-go/ftypetab.json")
 	content, err := ioutil.ReadFile(path)
 
 	if err != nil {
@@ -237,7 +238,7 @@ var (
 	errMaxLen   = errors.New("MAX length Exceeded")
 )
 
-func AuditRuleFieldPairData(rule *AuditRuleData, fieldval interface{}, opval uint32, fieldname string, fieldmap Field, flags int) error {
+func AuditRuleFieldPairData(rule *AuditRuleData, fieldval interface{}, opval uint32, fieldname string, fieldmap Field, flags int, prefixPath string) error {
 
 	if rule.Field_count >= (AUDIT_MAX_FIELDS - 1) {
 		log.Println("Max Fields Exceeded")
@@ -333,7 +334,7 @@ func AuditRuleFieldPairData(rule *AuditRuleData, fieldval interface{}, opval uin
 
 		//TODO: String handling part
 		//else {
-		//	rule->values[rule->field_count] = 
+		//	rule->values[rule->field_count] =
 		//			audit_name_to_errno(v);
 		//	if (rule->values[rule->field_count] == 0)
 		//		return -15;
@@ -446,7 +447,7 @@ func AuditRuleFieldPairData(rule *AuditRuleData, fieldval interface{}, opval uin
 				return fmt.Errorf("Flag can only be AUDIT_EXIT in case of AUDIT_FILETYPE")
 			}
 			var fileval int
-			err := AuditNameToFtype(val, &fileval)
+			err := AuditNameToFtype(val, prefixPath, &fileval)
 			if err != nil {
 				return err
 			}
@@ -521,7 +522,7 @@ func setActionAndFilters(actions []interface{}) (int, int) {
 	filter := AUDIT_FILTER_UNSET
 
 	for _, value := range actions {
-		if  value == "never" {
+		if value == "never" {
 			action = AUDIT_NEVER
 		} else if value == "possible" {
 			action = AUDIT_POSSIBLE
@@ -574,31 +575,31 @@ func AuditAddRuleData(s *NetlinkConnection, rule *AuditRuleData, flags int, acti
 }
 
 //Sets each rule after reading configuration file
-func SetRules(s *NetlinkConnection, content []byte) error {
+func SetRules(s *NetlinkConnection, content []byte, prefixPath string) error {
 
 	var rules interface{}
 	err := json.Unmarshal(content, &rules)
 	if err != nil {
 		//log.Print("Error:", err)
-		return err 
+		return err
 	}
 
 	m := rules.(map[string]interface{})
 
 	//var conf Config
-	var x86_map interface{} 
+	var x86Map interface{}
 	var fieldmap Field
 
 	// Load x86 map and fieldtab.json
-	err = loadSysMap_FieldTab(&x86_map, &fieldmap)
+	err = loadSysMapFieldTab(prefixPath, &x86Map, &fieldmap)
 	if err != nil {
 		log.Println("Error :", err)
 		return err
 	}
-	syscall_map := x86_map.(map[string]interface{})
-	
+	syscallMap := x86Map.(map[string]interface{})
+
 	for k, v := range m {
-		_audit_syscalladded = false;
+		_audit_syscalladded = false
 		switch k {
 		case "file_rules":
 			vi := v.([]interface{})
@@ -629,7 +630,7 @@ func SetRules(s *NetlinkConnection, content []byte) error {
 
 				key := rule["key"]
 				if key != nil {
-					err = AuditRuleFieldPairData(&dd, key, AUDIT_EQUAL, "key", fieldmap, AUDIT_FILTER_UNSET) // &AUDIT_BIT_MASK
+					err = AuditRuleFieldPairData(&dd, key, AUDIT_EQUAL, "key", fieldmap, AUDIT_FILTER_UNSET, prefixPath) // &AUDIT_BIT_MASK
 					if err != nil {
 						return err
 					}
@@ -649,25 +650,25 @@ func SetRules(s *NetlinkConnection, content []byte) error {
 				var dd AuditRuleData
 				dd.Buf = make([]byte, 0)
 				// Process syscalls
-				// TODO: support syscall no 
+				// TODO: support syscall no
 				if srule["syscalls"] != nil {
 					syscalls := srule["syscalls"].([]interface{})
 					syscalls_not_found := ""
 					for _, syscall := range syscalls {
 						syscall := syscall.(string)
-						if syscall_map[syscall] != nil {
+						if syscallMap[syscall] != nil {
 							//log.Println("setting syscall rule", syscall)
-							err = AuditRuleSyscallData(&dd, int(syscall_map[syscall].(float64)))
+							err = AuditRuleSyscallData(&dd, int(syscallMap[syscall].(float64)))
 							if err == nil {
 								_audit_syscalladded = true
 							} else {
 								return err
 							}
 						}
-						syscalls_not_found += " "+syscall
+						syscalls_not_found += " " + syscall
 					}
 					if _audit_syscalladded != true {
-						return errors.New("One or more syscall not found: "+ syscalls_not_found )
+						return errors.New("One or more syscall not found: " + syscalls_not_found)
 					}
 				}
 
@@ -675,7 +676,7 @@ func SetRules(s *NetlinkConnection, content []byte) error {
 				actions := srule["actions"].([]interface{})
 
 				//Apply action on syscall by separating the filters (exit) from actions (always)
-				action ,filter := setActionAndFilters(actions)
+				action, filter := setActionAndFilters(actions)
 
 				// Process fields
 				if srule["fields"] == nil {
@@ -706,7 +707,7 @@ func SetRules(s *NetlinkConnection, content []byte) error {
 						}
 
 						//Take appropriate action according to filters provided
-						err = AuditRuleFieldPairData(&dd, fieldval, opval, fieldname.(string), fieldmap, filter) // &AUDIT_BIT_MASK
+						err = AuditRuleFieldPairData(&dd, fieldval, opval, fieldname.(string), fieldmap, filter, prefixPath) // &AUDIT_BIT_MASK
 						if err != nil {
 							return err
 						}
@@ -715,7 +716,7 @@ func SetRules(s *NetlinkConnection, content []byte) error {
 
 				key := srule["key"]
 				if key != nil {
-					err = AuditRuleFieldPairData(&dd, key, AUDIT_EQUAL, "key", fieldmap, AUDIT_FILTER_UNSET) // &AUDIT_BIT_MASK
+					err = AuditRuleFieldPairData(&dd, key, AUDIT_EQUAL, "key", fieldmap, AUDIT_FILTER_UNSET, prefixPath) // &AUDIT_BIT_MASK
 					if err != nil {
 						return err
 					}
@@ -730,7 +731,7 @@ func SetRules(s *NetlinkConnection, content []byte) error {
 				if filter != AUDIT_FILTER_UNSET {
 					AuditAddRuleData(s, &dd, filter, action)
 				} else {
-					return fmt.Errorf("Filters not set or invalid: " + actions[0].(string)+", "+actions[1].(string))
+					return fmt.Errorf("Filters not set or invalid: " + actions[0].(string) + ", " + actions[1].(string))
 				}
 			}
 		}
@@ -780,7 +781,7 @@ func AuditSetupAndAddWatchDir(rule *AuditRuleData, path_name string) error {
 
 	if fileInfo, err := os.Stat(path_name); err != nil {
 		if os.IsNotExist(err) {
-			return errors.New("File does Not exist: "+path_name)
+			return errors.New("File does Not exist: " + path_name)
 		} else {
 			return err
 		}
@@ -812,10 +813,9 @@ func AuditAddWatchDir(type_name uint16, rule *AuditRuleData, path_name string) e
 	rule.Action = uint32(AUDIT_ALWAYS)
 	// set mask
 	// TODO : Setup audit_rule_syscallbyname_data(rule, "all")
-	for i:=0 ; i < AUDIT_BITMASK_SIZE-1; i++ {
+	for i := 0; i < AUDIT_BITMASK_SIZE-1; i++ {
 		rule.Mask[i] = 0xFFFFFFFF
 	}
-
 
 	rule.Field_count = uint32(2)
 	rule.Fields[0] = uint32(type_name)
@@ -917,9 +917,8 @@ done:
 			return err
 		}
 
-
 		for _, m := range msgs {
-			
+
 			address, er := syscall.Getsockname(s.fd)
 			if er != nil {
 				log.Println("ERROR:", er)
@@ -928,12 +927,12 @@ done:
 			switch v := address.(type) {
 			case *syscall.SockaddrNetlink:
 				if m.Header.Seq != wb.Header.Seq {
-					return errors.New("Wrong Seq nr, "+strconv.FormatUint(uint64(m.Header.Seq), 10)+
-						" expected "+strconv.FormatUint(uint64(wb.Header.Seq), 10))
+					return errors.New("Wrong Seq nr, " + strconv.FormatUint(uint64(m.Header.Seq), 10) +
+						" expected " + strconv.FormatUint(uint64(wb.Header.Seq), 10))
 				}
 				if m.Header.Pid != v.Pid {
-					return errors.New("Wrong pid,"+strconv.FormatUint(uint64(m.Header.Pid), 10)+
-						" expected"+ strconv.FormatUint(uint64(v.Pid), 10))
+					return errors.New("Wrong pid," + strconv.FormatUint(uint64(m.Header.Pid), 10) +
+						" expected" + strconv.FormatUint(uint64(v.Pid), 10))
 				}
 			default:
 				log.Println("ERROR:", syscall.EINVAL)
@@ -954,4 +953,3 @@ done:
 	}
 	return nil
 }
-

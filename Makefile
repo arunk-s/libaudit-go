@@ -1,9 +1,5 @@
-GO := GO15VENDOREXPERIMENT=1 go
 GOPATH := $(GOPATH)
 GOROOT := $(GOROOT)
+GO := GO15VENDOREXPERIMENT=1 $(GOROOT)/bin/go
 test:
-	sudo -s
-	export GOPATH=$(GOPATH)
-	export GOROOT=$(GOROOT)
-	export PATH=$(PATH):$(GOROOT)/bin
-	$(GO) test -v github.com/mozilla/libaudit-go
+	sudo -E GOROOT=$(GOROOT) GOPATH=$(GOPATH) $(GO) test -v github.com/mozilla/libaudit-go
